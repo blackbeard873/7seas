@@ -1,146 +1,248 @@
-# setup-7seas.ps1
-# Creates a complete FastAPI MMORPG project structure
+# -----------------------------
 
-Write-Host "⚓ Setting up 7seas FastAPI project..."
+# Full 7seas Project Setup Script
 
-# Step 1: Clean old folder
-if (Test-Path ".\7seas") {
-    Write-Host "🧹 Removing old 7seas folder..."
-    Remove-Item -Recurse -Force ".\7seas"
-}
+# -----------------------------
 
-# Step 2: Create folder structure
-Write-Host "📁 Creating new folder structure..."
-New-Item -ItemType Directory -Path ".\7seas\app\models" | Out-Null
-New-Item -ItemType Directory -Path ".\7seas\app\routers" | Out-Null
-New-Item -ItemType Directory -Path ".\7seas\app\tests" | Out-Null
+# Prompt for GitHub repo URL
 
-# Step 3: Create __init__.py files
-'' | Set-Content ".\7seas\app\__init__.py"
-'' | Set-Content ".\7seas\app\models\__init__.py"
-'' | Set-Content ".\7seas\app\routers\__init__.py"
-'' | Set-Content ".\7seas\app\tests\__init__.py"
+$githubRepo = Read-Host "Enter your GitHub repository URL (or leave blank to skip push)"
 
-# Step 4: Create main.py
-@'
+# Root project path
+
+$rootPath = "C:\projects\7seas"
+
+# -------------------------
+
+Write-Host "`nCleaning project folder..."
+Get-ChildItem $rootPath -Force | Where-Object { $_.FullName -ne $MyInvocation.MyCommand.Definition } | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+Write-Host "Creating folder structure..."
+$folders = @(
+"$rootPath\app",
+"$rootPath\app\routers",
+"$rootPath\app\models",
+"$rootPath\app\tests"
+)
+foreach ($folder in $folders) { New-Item -ItemType Directory -Path $folder -Force | Out-Null }
+
+Write-Host "Creating **init**.py files..."
+$initPaths = @(
+"$rootPath\app_*init*_.py",
+"$rootPath\app\routers_*init*_.py",
+"$rootPath\app\models_*init*_.py",
+"$rootPath\app\tests_*init*_.py"
+)
+foreach ($initPath in $initPaths) { New-Item -ItemType File -Path $initPath -Force | Out-Null }
+
+# --- main.py ---
+
+$mainPath = "$rootPath\app\main.py"
+$mainContent = @"
 from fastapi import FastAPI
-from app.routers import players, factions, auth
-from app.database import create_db_and_tables
+from app.routers import example
 
-app = FastAPI(title="7seas MMORPG API")
+app = FastAPI()
+app.include_router(example.router)
 
-app.include_router(players.router, prefix="/players", tags=["players"])
-app.include_router(factions.router, prefix="/factions", tags=["factions"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+@app.get('/')
+def read_root():
+return {'message': '7seas API is running!'}
+"@
+$mainContent | Out-File -FilePath $mainPath -Encoding utf8 -Force
 
-@app.on_event("startup")
-async def on_startup():
-    await create_db_and_tables()
-'@ | Set-Content ".\7seas\app\main.py"
+# --- example router ---
 
-# Step 5: Create database.py
-@'
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+$exampleRouterPath = "$rootPath\app\routers/example.py"
+$exampleRouterContent = @"
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get('/example')
+def example_route():
+return {'example': 'This is an example route'}
+"@
+$exampleRouterContent | Out-File -FilePath $exampleRouterPath -Encoding utf8 -Force
+
+# --- database.py ---
+
+$dbPath = "$rootPath\app\models/database.py"
+$dbContent = @"
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "sqlite+aiosqlite:///./7seas.db"
+DATABASE_URL = 'sqlite+aiosqlite:///./7seas.db'
 
 engine = create_async_engine(DATABASE_URL, echo=True)
 async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 Base = declarative_base()
+"@
+$dbContent | Out-File -FilePath $dbPath -Encoding utf8 -Force
 
-async def create_db_and_tables():
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-'@ | Set-Content ".\7seas\app\database.py"
+# --- model ---
 
-# Step 6: Create models
-@'
-from sqlalchemy import Integer, String, ForeignKey, Column
-from app.database import Base
+$modelPath = "$rootPath\app\models/player.py"
+$modelContent = @"
+from sqlalchemy import Column, Integer, String
+from .database import Base
 
 class Player(Base):
-    __tablename__ = "players"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
-    faction_id = Column(Integer, ForeignKey("factions.id"), nullable=True)
-'@ | Set-Content ".\7seas\app\models\player.py"
+**tablename** = 'players'
+id = Column(Integer, primary_key=True, index=True)
+name = Column(String, index=True)
+level = Column(Integer, default=1)
+"@
+$modelContent | Out-File -FilePath $modelPath -Encoding utf8 -Force
 
-@'
-from sqlalchemy import Integer, String, Column
-from app.database import Base
+# --- test file ---
 
-class Faction(Base):
-    __tablename__ = "factions"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
-'@ | Set-Content ".\7seas\app\models\faction.py"
-
-# Step 7: Routers
-@'
-from fastapi import APIRouter
-router = APIRouter()
-
-@router.get("/")
-async def list_players():
-    return {"players": []}
-'@ | Set-Content ".\7seas\app\routers\players.py"
-
-@'
-from fastapi import APIRouter
-router = APIRouter()
-
-@router.get("/")
-async def list_factions():
-    return {"factions": []}
-'@ | Set-Content ".\7seas\app\routers\factions.py"
-
-@'
-from fastapi import APIRouter
-router = APIRouter()
-
-@router.post("/login")
-async def login(username: str, password: str):
-    return {"username": username, "status": "logged in"}
-'@ | Set-Content ".\7seas\app\routers\auth.py"
-
-# Step 8: Tests
-@'
+$testPath = "$rootPath\app/tests/test_basic.py"
+$testContent = @"
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
-def test_read_main():
-    response = client.get("/players/")
-    assert response.status_code == 200
-    assert "players" in response.json()
-'@ | Set-Content ".\7seas\app\tests\test_main.py"
+def test_root():
+response = client.get('/')
+assert response.status_code == 200
+assert response.json() == {'message': '7seas API is running!'}
+"@
+$testContent | Out-File -FilePath $testPath -Encoding utf8 -Force
 
-# Step 9: requirements.txt
-@'
-fastapi==0.111.1
-uvicorn==0.26.1
-sqlalchemy==2.0.21
-pydantic==2.8.0
-aiosqlite==0.19.0
-'@ | Set-Content ".\7seas\requirements.txt"
+# --- .gitignore ---
 
-# Step 10: .gitignore
-@'
+$gitignorePath = "$rootPath.gitignore"
+$gitignoreContent = @"
+
+# Virtual environment
+
 .venv/
-__pycache__/
+
+# Python bytecode
+
+**pycache**/
 *.pyc
+*.pyo
+*.pyd
+
+# Database files
+
+*.sqlite3
+
+# Environment files
+
 .env
-'@ | Set-Content ".\7seas\.gitignore"
 
-# Step 11: Create venv
-Write-Host "🐍 Creating virtual environment..."
-python -m venv ".\7seas\.venv"
+# IDE/editor files
 
-Write-Host "`n✅ Setup complete!"
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+
+.DS_Store
+Thumbs.db
+
+# Logs
+
+*.log
+
+# Coverage reports
+
+htmlcov/
+.coverage
+"@
+$gitignoreContent | Out-File -FilePath $gitignorePath -Encoding utf8 -Force
+
+# --- README.md ---
+
+$readmePath = "$rootPath\README.md"
+$readmeContent = @"
+
+# 7seas - FastAPI MMORPG Project
+
+7seas is a FastAPI-based MMORPG backend project.
+This repository includes routes, models, and test setup for a fully async Python API project.
+
+## Getting Started
+
+```powershell
+cd C:\projects\7seas
+python -m venv .venv
+..venv\Scripts\Activate.ps1
+pip install fastapi uvicorn sqlalchemy aiosqlite pydantic httpx
+uvicorn app.main:app --reload
+pytest -v
+```
+
+## License
+
+[MIT License](LICENSE)
+"@
+$readmeContent | Out-File -FilePath $readmePath -Encoding utf8 -Force
+
+# --- MIT LICENSE ---
+
+$licensePath = "$rootPath\LICENSE"
+$licenseContent = @"
+MIT License
+
+Copyright (c) $(Get-Date -Format yyyy) blackbeard873
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the 'Software'), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+"@
+$licenseContent | Out-File -FilePath $licensePath -Encoding utf8 -Force
+
+# --- Git initialization ---
+
+Write-Host "`nInitializing Git repository..."
+Set-Location $rootPath
+git init
+git add .
+git commit -m "Initial commit: working FastAPI 7seas project"
+
+# Optional: push to GitHub
+
+if ($githubRepo -ne "") {
+git remote add origin $githubRepo
+git branch -M main
+Write-Host "Pushing to GitHub..."
+git push -u origin main
+}
+
+# --- Create and activate virtual environment ---
+
+Write-Host "`nCreating and activating virtual environment..."
+python -m venv .venv
+& ..venv\Scripts\Activate.ps1
+
+# --- Install dependencies ---
+
+Write-Host "`nInstalling dependencies..."
+pip install fastapi uvicorn sqlalchemy aiosqlite pydantic httpx pytest
+
+Write-Host "`n✅ Project setup complete!"
 Write-Host "Next steps:"
-Write-Host "1. cd 7seas"
-Write-Host "2. .\\.venv\\Scripts\\Activate.ps1"
-Write-Host "3. pip install -r requirements.txt"
-Write-Host "4. uvicorn app.main:app --reload"
+Write-Host "1. uvicorn app.main:app --reload"
+Write-Host "2. pytest -v"
+Write-Host "3. Verify your GitHub repository and README.md"
