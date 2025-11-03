@@ -1,0 +1,14 @@
+﻿.venv/
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+
+# IDE-specific
+
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
