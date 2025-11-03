@@ -1,13 +1,13 @@
 ﻿from fastapi import FastAPI
-from app.routers import auth, players, factions
-from app.database import create_db_and_tables
+from app.routers import players, factions, auth
 
-app = FastAPI(title='7seas MMORPG')
+app = FastAPI(title="7seas MMORPG")
 
-app.include_router(auth.router)
-app.include_router(players.router)
-app.include_router(factions.router)
+# Include routers
+app.include_router(players.router, prefix="/players", tags=["Players"])
+app.include_router(factions.router, prefix="/factions", tags=["Factions"])
+app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 
-@app.on_event('startup')
-async def on_startup():
-    await create_db_and_tables()
+@app.get("/")
+def root():
+    return {"message": "Welcome to 7seas MMORPG API!"}

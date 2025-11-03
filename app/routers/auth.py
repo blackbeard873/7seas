@@ -1,6 +1,7 @@
 ﻿from fastapi import APIRouter
-router = APIRouter(prefix='/auth', tags=['auth'])
 
-@router.post('/login')
-async def login():
-    return {'message': 'login route'}
+router = APIRouter()
+
+@router.get("/login")
+def login():
+    return {"message": "Login route active"}

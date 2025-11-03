@@ -1,6 +1,7 @@
 ﻿from fastapi import APIRouter
-router = APIRouter(prefix='/players', tags=['players'])
 
-@router.get('/')
-async def list_players():
-    return {'players': []}
+router = APIRouter()
+
+@router.get("/")
+def list_players():
+    return [{"id": 1, "name": "Captain Jack"}]
