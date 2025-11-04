@@ -3,7 +3,7 @@ from app.main import app
 
 client = TestClient(app)
 
-def test_example():
-response = client.get('/example')
-assert response.status_code == 200
-assert 'message' in response.json()
+def test_example_route():
+    response = client.get("/example/status")
+    assert response.status_code == 200
+    assert response.json() == {"status": "example route working"}

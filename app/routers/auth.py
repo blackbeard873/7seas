@@ -2,6 +2,6 @@
 
 router = APIRouter()
 
-@router.get("/login")
-def login():
-    return {"message": "Login route active"}
+@router.get("/status")
+async def auth_status():
+    return {"message": "Auth router is working!"}

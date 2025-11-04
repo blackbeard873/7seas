@@ -1,17 +1,14 @@
 ﻿from fastapi import FastAPI
-import importlib
-import pkgutil
-from app.routers import **path** as routers_path
+from app.routers import example, players, factions
 
-app = FastAPI()
+app = FastAPI(title="7seas MMORPG API")
 
-# Auto-include all routers in app.routers
+# Include routers
+app.include_router(example.router)
+app.include_router(players.router)
+app.include_router(factions.router)
 
-for _, module_name, _ in pkgutil.iter_modules(routers_path):
-module = importlib.import_module(f'app.routers.{module_name}')
-if hasattr(module, 'router'):
-app.include_router(module.router)
 
 @app.get("/")
-def read_root():
-return {"message": "7seas API is running!"}
+async def root():
+    return {"message": "Welcome to 7seas!"}
